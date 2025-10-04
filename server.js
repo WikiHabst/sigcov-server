@@ -9,7 +9,6 @@ const cors = require('cors');
 const jsdom = require('jsdom');
 const passport = require('passport');
 const session = require('express-session');
-// const MySQLStore = require('express-mysql-session')(session);
 const MediaWikiStrategy = require('passport-mediawiki-oauth').OAuthStrategy;
 const { Sequelize, DataTypes } = require('sequelize');
 const JSDOM = jsdom.JSDOM;
@@ -19,24 +18,6 @@ global.DOMParser = new JSDOM().window.DOMParser;
 // bot account and database access credentials, if needed
 const credentials = require('./credentials.json');
 const app = express();
-
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // for parsing the body of POST requests
-app.use(express.static('static')); // serve files in the static directory
-app.use(cors());
-app.set('trust proxy', 1);
-app.use(session({
-  secret: credentials.session_secret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 60000000000,
-    secure: true, // Toolforge runs HTTPS
-    sameSite: 'lax'
-  },
-}));
-app.use(passport.initialize());
-app.use(passport.session());
 
 const port = parseInt(process.env.PORT, 10); // necessary for the tool to be discovered by the nginx proxy
 
@@ -124,6 +105,24 @@ async function getDbConnection() {
 }
 
 (async function() {
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json()); // for parsing the body of POST requests
+  app.use(express.static('static')); // serve files in the static directory
+  app.use(cors());
+  app.set('trust proxy', 1);
+  app.use(session({
+    secret: credentials.session_secret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 60000000000,
+      secure: true, // Toolforge runs HTTPS
+      sameSite: 'lax'
+    },
+  }));
+  app.use(passport.initialize());
+  app.use(passport.session());
+  
 	// need to do either a .getSiteInfo() or .login() before we can use the client object
 	await client.getSiteInfo();
   await sequelize.sync();
