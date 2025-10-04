@@ -1,21 +1,36 @@
 /* eslint-env node, es6 */
 
 const express = require('express');
-
 // bot framework for interacting with the wiki, see https://www.npmjs.com/package/mwn
 const {mwn} = require('mwn');
-
 // sql client for database accesses, see https://www.npmjs.com/package/mysql2
 const mysql = require('mysql2/promise');
+const cors = require('cors');
+const jsdom = require('jsdom');
+const passport = require('passport');
+const session = require('express-session');
+// const MySQLStore = require('express-mysql-session')(session);
+const MediaWikiStrategy = require('passport-mediawiki-oauth').OAuthStrategy;
+const { Sequelize } = require('sequelize');
+const JSDOM = jsdom.JSDOM;
+
+global.DOMParser = new JSDOM().window.DOMParser;
 
 // bot account and database access credentials, if needed
-const crendentials = require('./credentials.json');
-
+const credentials = require('./credentials.json');
 const app = express();
 
 app.use(express.json()); // for parsing the body of POST requests
-
 app.use(express.static('static')); // serve files in the static directory
+app.use(cors());
+app.use(session({
+  secret: credentials.session_secret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 60000000000 },
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
 const port = parseInt(process.env.PORT, 10); // necessary for the tool to be discovered by the nginx proxy
 
@@ -23,22 +38,31 @@ const port = parseInt(process.env.PORT, 10); // necessary for the tool to be dis
 // API limits, otherwise just remove the username and password fields below.
 const client = new mwn({
 	apiUrl: 'https://en.wikipedia.org/w/api.php',
-	username: crendentials.bot_username,
-	password: crendentials.bot_password
+	username: credentials.bot_username,
+	password: credentials.bot_password
 });
+
+passport.use(new MediaWikiStrategy({
+    consumerKey: credentials.oauth_1_clientid,
+    consumerSecret: credentials.oauth_1_secret,
+    callbackURL: 'https://sigcovhunter.toolforge.org/callback'
+  },
+  function(token, tokenSecret, profile, done) {
+    console.log('got profile', profile);
+  }
+));
 
 async function getDbConnection() {
 	return await mysql.createConnection({
 		host: 'enwiki.analytics.db.svc.eqiad.wmflabs',
 		port: 3306,
-		user: crendentials.db_user,
-		password: crendentials.db_password,
+		user: credentials.db_user,
+		password: credentials.db_password,
 		database: 'enwiki_p'
 	});
 }
 
 (async function() {
-
 	// need to do either a .getSiteInfo() or .login() before we can use the client object
 	await client.getSiteInfo();
 
@@ -47,10 +71,57 @@ async function getDbConnection() {
 		res.sendFile(__dirname + '/static/index.html');
 	});
 
-	app.get('/get_endpoint', (req, res) => {
-		// req.query gives the GET parameters
-		res.send('Hello World!');
-	});
+  app.get('/login', passport.authenticate('mediawiki', { scope: 'email' /* ? */ }));
+  app.get('/callback', 
+    passport.authenticate('mediawiki', { failureRedirect: '/failure' }),
+    function(req, res) {
+      // Successful authentication, redirect home.
+      res.redirect('/success');
+    });
+
+  const ns = {};
+  const ocr = {};
+  app.get('/news', async (req, res) => {
+    try {
+      const { title } = req.query;
+      const [base, dab = ''] = title.split(' (');
+      const keyword = `"${base}" ${dab.slice(0, -1)}`.trim();
+      ns[keyword] ??= await (await fetch(`https://www.newspapers.com/api/search/query?${new URLSearchParams({
+        keyword,
+        sort: 'paper-date-asc',
+        'entity-types': 'page,obituary,marriage,birth,enslavement',
+        count: '100',
+      })}`)).json();
+      const matches = [];
+      for (const rec of ns[keyword].records.slice(0, 2)) {
+        console.log(rec);
+        const pgid = rec.page.id;
+        const pgUrl = `https://www.newspapers.com/newspage/${pgid}/`;
+        if (!ocr[pgid]) {
+          const html = await (await fetch(pgUrl, {
+            headers: { cookie: credentials.nscookie },
+          })).text();
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          ocr[pgid] = JSON.parse(doc.querySelector('#mainContent script')?.innerHTML ?? 'null');
+        }
+        const idxs = [...(ocr[pgid]?.text.matchAll(new RegExp(base, 'ig')) ?? [])].map(m => m.index);
+        for (const i of idxs) {
+          const snip = ocr[pgid].text.slice(i - 200, i + base.length + 200).replaceAll(new RegExp(base, 'ig'), `**${base}**`);
+          matches.push({
+            snip,
+            publication: rec.publication, // id, name, location
+            date: rec.page.date,
+            pageNo: rec.page.pageNumber,
+            url: pgUrl,
+          });
+        }
+      }
+      res.send(matches);
+    } catch (e) {
+      console.log(e)
+      res.send(e);
+    }
+  });
 
 	app.post('/post_endpoint', (req, res) => {
 		// req.body gives the POST body
