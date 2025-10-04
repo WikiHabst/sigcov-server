@@ -56,6 +56,21 @@ async function testConnection() {
 }
 testConnection();
 
+passport.serializeUser((user, done) => {
+  done(null, user.username);
+});
+
+passport.deserializeUser(async (username, done) => {
+  try {
+    const user = await User.find({
+      where: { username }
+    });
+    done(null, user);
+  } catch (err) {
+    done(err);
+  }
+});
+
 passport.use(new MediaWikiStrategy({
     consumerKey: credentials.oauth_1_clientid,
     consumerSecret: credentials.oauth_1_secret,
