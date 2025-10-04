@@ -25,6 +25,7 @@
     "express-mysql-session": "^3.0.3",
     "express-session": "^1.18.2",
     "jsdom": "^27.0.0",
+    "mariadb": "^3.4.5",
     "mongoose": "^8.19.0",
     "mwn": "^0.11.0",
     "mysql2": "^2.2.5",
