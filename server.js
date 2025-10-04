@@ -57,6 +57,11 @@ async function testConnection() {
 testConnection();
 
 const User = sequelize.define('User', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
   username: {
     type: DataTypes.STRING,
     unique: true,
@@ -180,6 +185,11 @@ async function getDbConnection() {
       console.log(e)
       res.send(e);
     }
+  });
+
+  app.get('/test-session', (req, res) => {
+    console.log(req.session);
+    res.send(req.session);
   });
 
   app.get('/sync', async (req, res) => {
