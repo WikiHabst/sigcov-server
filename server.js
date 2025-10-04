@@ -77,11 +77,11 @@ passport.use(new MediaWikiStrategy({
 const User = sequelize.define('User', {
   username: {
     type: DataTypes.STRING,
-    unique: true, // Ensure uniqueness for proper findOrCreate behavior
+    unique: true,
     allowNull: false,
   },
   score: {
-    type: DataTypes.NUMBER,
+    type: DataTypes.INTEGER,
     defaultValue: 0,
   },
   token: {
