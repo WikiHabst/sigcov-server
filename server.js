@@ -46,6 +46,15 @@ const sequelize = new Sequelize(credentials.dbname, credentials.dbuser, credenti
   host: 'tools.db.svc.wikimedia.cloud',
   dialect: 'mariadb',
 });
+async function testConnection() {
+  try {
+    await sequelize.authenticate();
+    console.log('Connection has been established successfully.');
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+  }
+}
+testConnection();
 
 passport.use(new MediaWikiStrategy({
     consumerKey: credentials.oauth_1_clientid,
@@ -158,6 +167,17 @@ async function getDbConnection() {
       res.send(e);
     }
   });
+
+  app.get('/sync', async (req, res) => {
+    try {
+      if (req.query.password === credentials.session_secret) {
+        await sequelize.sync({ force: true });
+      }
+      res.sendStatus(200);
+    } catch (e) {
+      res.status(500).send(e);
+    }
+  })
 
 	app.post('/post_endpoint', (req, res) => {
 		// req.body gives the POST body
