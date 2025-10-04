@@ -72,15 +72,11 @@ const User = sequelize.define('User', {
 });
 
 passport.serializeUser((user, done) => {
-  console.log(user, user.dataValues, user.dataValues.username);
-  done(null, user.dataValues.username);
+  done(null, user.id);
 });
-
-passport.deserializeUser(async (username, done) => {
+passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.find({
-      where: { username }
-    });
+    const user = await User.findByPk(id);
     done(null, user);
   } catch (err) {
     done(err);
