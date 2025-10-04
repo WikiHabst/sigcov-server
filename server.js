@@ -72,6 +72,10 @@ const User = sequelize.define('User', {
 });
 
 passport.serializeUser((user, done) => {
+  console.log('serializing', user, user._json);
+  if (!user || !user.username) {
+    return done(new Error('User or username is undefined in serializeUser'));
+  }
   done(null, user.username);
 });
 
