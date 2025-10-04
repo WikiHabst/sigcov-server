@@ -17,82 +17,7 @@ global.DOMParser = new JSDOM().window.DOMParser;
 
 // bot account and database access credentials, if needed
 const credentials = require('./credentials.json');
-const app = express();
-
 const port = parseInt(process.env.PORT, 10); // necessary for the tool to be discovered by the nginx proxy
-
-// You may want to sign in with a bot account if you want to make use of high bot
-// API limits, otherwise just remove the username and password fields below.
-const client = new mwn({
-	apiUrl: 'https://en.wikipedia.org/w/api.php',
-	username: credentials.bot_username,
-	password: credentials.bot_password
-});
-
-const sequelize = new Sequelize(credentials.dbname, credentials.dbuser, credentials.dbpass, {
-  host: 'tools.db.svc.wikimedia.cloud',
-  dialect: 'mariadb',
-});
-async function testConnection() {
-  try {
-    await sequelize.authenticate();
-    console.log('Connection has been established successfully.');
-  } catch (error) {
-    console.error('Unable to connect to the database:', error);
-  }
-}
-testConnection();
-
-const User = sequelize.define('User', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
-  username: {
-    type: DataTypes.STRING,
-    unique: true,
-    allowNull: false,
-  },
-  score: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  token: {
-    type: DataTypes.STRING,
-  }
-});
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findByPk(id);
-    done(null, user);
-  } catch (err) {
-    done(err);
-  }
-});
-
-passport.use(new MediaWikiStrategy({
-    consumerKey: credentials.oauth_1_clientid,
-    consumerSecret: credentials.oauth_1_secret,
-    callbackURL: 'https://sigcovhunter.toolforge.org/callback'
-  },
-  async function(token, tokenSecret, profile, done) {
-    try {
-      const [user, created] = await User.findOrCreate({
-        where: { username: profile._json.username },
-      });
-      await user.update({ token: token });
-      return done(null, user);
-    } catch (err) {
-      return done(err);
-    }
-  }
-));
-
 
 async function getDbConnection() {
 	return await mysql.createConnection({
@@ -105,6 +30,7 @@ async function getDbConnection() {
 }
 
 (async function() {
+  const app = express();
   app.use(express.urlencoded({ extended: true }));
   app.use(express.json()); // for parsing the body of POST requests
   app.use(express.static('static')); // serve files in the static directory
@@ -122,7 +48,71 @@ async function getDbConnection() {
   }));
   app.use(passport.initialize());
   app.use(passport.session());
-  
+  const client = new mwn({
+    apiUrl: 'https://en.wikipedia.org/w/api.php',
+    username: credentials.bot_username,
+    password: credentials.bot_password
+  });
+  const sequelize = new Sequelize(credentials.dbname, credentials.dbuser, credentials.dbpass, {
+    host: 'tools.db.svc.wikimedia.cloud',
+    dialect: 'mariadb',
+  });
+  async function testConnection() {
+    try {
+      await sequelize.authenticate();
+      console.log('Connection has been established successfully.');
+    } catch (error) {
+      console.error('Unable to connect to the database:', error);
+    }
+  }
+  await testConnection();
+  const User = sequelize.define('User', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    username: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+    },
+    score: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    token: {
+      type: DataTypes.STRING,
+    }
+  });
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const user = await User.findByPk(id);
+      done(null, user);
+    } catch (err) {
+      done(err);
+    }
+  });
+  passport.use(new MediaWikiStrategy({
+      consumerKey: credentials.oauth_1_clientid,
+      consumerSecret: credentials.oauth_1_secret,
+      callbackURL: 'https://sigcovhunter.toolforge.org/callback'
+    },
+    async function(token, tokenSecret, profile, done) {
+      try {
+        const [user, created] = await User.findOrCreate({
+          where: { username: profile._json.username },
+        });
+        await user.update({ token: token });
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
+    }
+  ));
 	// need to do either a .getSiteInfo() or .login() before we can use the client object
 	await client.getSiteInfo();
   await sequelize.sync();
