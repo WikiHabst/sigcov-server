@@ -20,14 +20,20 @@ global.DOMParser = new JSDOM().window.DOMParser;
 const credentials = require('./credentials.json');
 const app = express();
 
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // for parsing the body of POST requests
 app.use(express.static('static')); // serve files in the static directory
 app.use(cors());
+app.set('trust proxy', 1);
 app.use(session({
   secret: credentials.session_secret,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 60000000000 },
+  cookie: {
+    maxAge: 60000000000,
+    secure: true, // Toolforge runs HTTPS
+    sameSite: 'lax'
+  },
 }));
 app.use(passport.initialize());
 app.use(passport.session());
