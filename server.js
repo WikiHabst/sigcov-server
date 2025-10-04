@@ -55,7 +55,7 @@ passport.use(new MediaWikiStrategy({
   async function(token, tokenSecret, profile, done) {
     try {
       const [user, created] = await User.findOrCreate({
-        where: { username: profile.username },
+        where: { username: profile._json.username },
       });
       await user.update({ token: token });
       return done(null, user);
