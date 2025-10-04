@@ -72,6 +72,7 @@ const User = sequelize.define('User', {
 });
 
 passport.serializeUser((user, done) => {
+  console.log(user, user.dataValues, user.dataValues.username);
   done(null, user.dataValues.username);
 });
 
