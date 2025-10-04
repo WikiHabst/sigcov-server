@@ -102,6 +102,7 @@ async function getDbConnection() {
 (async function() {
 	// need to do either a .getSiteInfo() or .login() before we can use the client object
 	await client.getSiteInfo();
+  await sequelize.sync();
 
 	// Serve index.html as the homepage
 	app.get('/', (req, res) => {
