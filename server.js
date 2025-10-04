@@ -20,24 +20,6 @@ global.DOMParser = new JSDOM().window.DOMParser;
 const credentials = require('./credentials.json');
 const app = express();
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // for parsing the body of POST requests
-app.use(express.static('static')); // serve files in the static directory
-app.use(cors());
-app.set('trust proxy', 1);
-app.use(session({
-  secret: credentials.session_secret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 60000000000,
-    secure: true, // Toolforge runs HTTPS
-    sameSite: 'lax'
-  },
-}));
-app.use(passport.initialize());
-app.use(passport.session());
-
 const port = parseInt(process.env.PORT, 10); // necessary for the tool to be discovered by the nginx proxy
 
 // You may want to sign in with a bot account if you want to make use of high bot
@@ -128,7 +110,25 @@ async function getDbConnection() {
 	await client.getSiteInfo();
   await sequelize.sync();
 
-	// Serve index.html as the homepage
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json()); // for parsing the body of POST requests
+  app.use(express.static('static')); // serve files in the static directory
+  app.use(cors());
+  app.set('trust proxy', 1);
+  app.use(session({
+    secret: credentials.session_secret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 60000000000,
+      secure: true, // Toolforge runs HTTPS
+      sameSite: 'lax'
+    },
+  }));
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Serve index.html as the homepage
 	app.get('/', (req, res) => {
 		res.sendFile(__dirname + '/static/index.html');
 	});
@@ -142,12 +142,12 @@ async function getDbConnection() {
   });
 
   app.get('/login', passport.authenticate('mediawiki', { scope: 'email' /* ? */ }));
-  app.get('/callback', 
-    passport.authenticate('mediawiki', { failureRedirect: '/failure' }),
-    function(req, res) {
-      // Successful authentication, redirect home.
-      res.redirect('/success');
-    });
+  app.get('/callback', (req, res, next) => {
+    console.log('req._passport:', req._passport);
+    next();
+  }, passport.authenticate('mediawiki', { failureRedirect: '/failure' }), (req, res) => {
+    res.redirect('/success');
+  });
 
   const ns = {};
   const ocr = {};
