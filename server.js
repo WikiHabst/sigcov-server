@@ -1,17 +1,21 @@
 /* eslint-env node, es6 */
 
 const express = require('express');
-// bot framework for interacting with the wiki, see https://www.npmjs.com/package/mwn
-const {mwn} = require('mwn');
 // sql client for database accesses, see https://www.npmjs.com/package/mysql2
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const jsdom = require('jsdom');
 const passport = require('passport');
 const session = require('express-session');
-const MediaWikiStrategy = require('passport-mediawiki-oauth').OAuthStrategy;
-const { Sequelize, DataTypes } = require('sequelize');
+const OAuth2Strategy = require('passport-oauth2');
+const axios = require('axios');
 const JSDOM = jsdom.JSDOM;
+const { User, OAuthToken, init } = require('./models');
+
+const MW_WIKI_BASE = "https://en.wikipedia.org";
+const AUTHORIZATION_URL = `${MW_WIKI_BASE}/rest.php/oauth2/authorize`;
+const TOKEN_URL = `${MW_WIKI_BASE}/rest.php/oauth2/access_token`;
+const PROFILE_URL = `${MW_WIKI_BASE}/rest.php/oauth2/resource/profile`;
 
 global.DOMParser = new JSDOM().window.DOMParser;
 
@@ -19,104 +23,107 @@ global.DOMParser = new JSDOM().window.DOMParser;
 const credentials = require('./credentials.json');
 const port = parseInt(process.env.PORT, 10); // necessary for the tool to be discovered by the nginx proxy
 
-const app = express();
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // for parsing the body of POST requests
-app.use(express.static('static')); // serve files in the static directory
-app.use(cors());
-app.set('trust proxy', 1);
-app.use(session({
-  secret: credentials.session_secret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 60000000000,
-    secure: true, // Toolforge runs HTTPS
-    sameSite: 'lax'
-  },
-}));
-app.use(passport.initialize());
-app.use(passport.session());
-const client = new mwn({
-	apiUrl: 'https://en.wikipedia.org/w/api.php',
-	username: credentials.bot_username,
-	password: credentials.bot_password
-});
-const sequelize = new Sequelize(credentials.dbname, credentials.dbuser, credentials.dbpass, {
-  host: 'tools.db.svc.wikimedia.cloud',
-  dialect: 'mariadb',
-});
-async function testConnection() {
-  try {
-    await sequelize.authenticate();
-    console.log('Connection has been established successfully.');
-  } catch (error) {
-    console.error('Unable to connect to the database:', error);
-  }
-}
-testConnection();
-const User = sequelize.define('User', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
-  username: {
-    type: DataTypes.STRING,
-    unique: true,
-    allowNull: false,
-  },
-  score: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  token: {
-    type: DataTypes.STRING,
-  }
-});
+// passport serialize/deserialize
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  done(null, user.sub);
 });
-passport.deserializeUser(async (id, done) => {
+passport.deserializeUser(async (sub, done) => {
   try {
-    const user = await User.findByPk(id);
-    done(null, user);
+    const user = await User.findOne({ where: { sub }, include: ['tokens'] });
+    done(null, user || null);
   } catch (err) {
     done(err);
   }
 });
-passport.use(new MediaWikiStrategy({
-    consumerKey: credentials.oauth_1_clientid,
-    consumerSecret: credentials.oauth_1_secret,
-    callbackURL: 'https://sigcovhunter.toolforge.org/callback'
-  },
-  async function(token, tokenSecret, profile, done) {
-    try {
-      const [user, created] = await User.findOrCreate({
-        where: { username: profile._json.username },
+
+// Create a custom OAuth2 strategy that fetches profile from MediaWiki
+class MediaWikiOAuth2Strategy extends OAuth2Strategy {
+  userProfile(accessToken, done) {
+    // The MediaWiki profile endpoint requires Authorization: Bearer <token>
+    axios.get(PROFILE_URL, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 5000
+    })
+      .then(res => {
+        // expected response contains fields like sub, username, email, groups, etc
+        const profile = res.data;
+        // normalize profile to passport-style object
+        const normalized = {
+          provider: 'mediawiki',
+          id: profile.sub || profile.username,
+          sub: profile.sub,
+          username: profile.username,
+          json: profile
+        };
+        done(null, normalized);
+      })
+      .catch(err => {
+        done(err);
       });
-      await user.update({ token: token });
-      return done(null, user);
-    } catch (err) {
-      return done(err);
-    }
   }
-));
-
-
-async function getDbConnection() {
-	return await mysql.createConnection({
-		host: 'enwiki.analytics.db.svc.eqiad.wmflabs',
-		port: 3306,
-		user: credentials.db_user,
-		password: credentials.db_password,
-		database: 'enwiki_p'
-	});
 }
 
-// need to do either a .getSiteInfo() or .login() before we can use the client object
-client.getSiteInfo();
-sequelize.sync();
+passport.use('mediawiki', new MediaWikiOAuth2Strategy({
+  authorizationURL: AUTHORIZATION_URL,
+  tokenURL: TOKEN_URL,
+  clientID: credentials.oauth_2_clientid,
+  clientSecret: credentials.oauth_2_secret,
+  callbackURL: 'https://sigcovhunter.toolforge.org/callback',
+  passReqToCallback: false
+}, async (accessToken, refreshToken, params, profile, done) => {
+  // params often contains expires_in, scope, token_type
+  try {
+    // If passport's userProfile didn't run automatically, attempt to fetch
+    if (!profile || !profile.sub) {
+      // attempt to GET profile
+      const resp = await axios.get(PROFILE_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
+      profile = {
+        provider: 'mediawiki',
+        id: resp.data.sub || resp.data.username,
+        sub: resp.data.sub,
+        username: resp.data.username,
+        json: resp.data
+      };
+    }
+
+    // upsert user
+    const [user] = await User.upsert({
+      sub: String(profile.sub || profile.id),
+      username: profile.username || profile.id,
+      profile: profile.json || profile
+    }, { returning: true });
+
+    // save token associated with user
+    const expiresAt = params && params.expires_in ? new Date(Date.now() + (params.expires_in * 1000)) : null;
+    await OAuthToken.create({
+      accessToken,
+      refreshToken,
+      scope: params && params.scope ? params.scope : null,
+      tokenType: params && params.token_type ? params.token_type : null,
+      expiresAt,
+      UserId: user.id
+    });
+
+    // attach profile object for express req.user
+    const userWithTokens = await User.findByPk(user.id, { include: ['tokens'] });
+    done(null, userWithTokens);
+  } catch (err) {
+    done(err);
+  }
+}));
+
+const app = express();
+app.use(express.json()); // for parsing the body of POST requests
+app.use(express.static('static')); // serve files in the static directory
+app.use(cors());
+app.use(session({
+  secret: credentials.session_secret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false },
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Serve index.html as the homepage
 app.get('/', (req, res) => {
@@ -131,22 +138,26 @@ app.get('/me', (req, res) => {
   }
 });
 
-app.get('/login', passport.authenticate('mediawiki', { scope: 'email' /* ? */ }));
-app.get('/callback',
-  session({
-    secret: credentials.session_secret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 60000000000, secure: true, sameSite: 'lax' },
-  }),
-  passport.initialize(),
-  passport.session(),
-  (req, res, next) => {
-  console.log('req._passport:', req._passport);
-  next();
-}, passport.authenticate('mediawiki', { failureRedirect: '/failure' }), (req, res) => {
-  res.redirect('/success');
+app.get('/login', (req, res, next) => {
+  // you can pass extra options e.g. scope, state, prompt
+  const opts = {
+    // example scope: 'openid profile email' — your consumer registration determines allowed grants
+    scope: req.query.scope || undefined,
+    state: req.query.state || undefined
+  };
+  passport.authenticate('mediawiki', opts)(req, res, next);
 });
+
+app.get('/callback',
+  passport.authenticate('mediawiki', {
+    failureRedirect: '/failure',
+    session: true
+  }),
+  (req, res) => {
+    // Successful authentication
+    res.redirect('/success');
+  }
+);
 
 const ns = {};
 const ocr = {};
@@ -200,17 +211,20 @@ app.get('/test-session', (req, res) => {
 app.get('/sync', async (req, res) => {
   try {
     if (req.query.password === credentials.session_secret) {
-      await sequelize.sync({ force: true });
+      await init({ force: true });
     }
     res.sendStatus(200);
   } catch (e) {
     res.status(500).send(e);
   }
-})
-
-app.post('/post_endpoint', (req, res) => {
-  // req.body gives the POST body
-  res.send('Hello World!');
 });
 
-app.listen(port, () => console.log(`Example app listening at port ${port}`));
+(async () => {
+  try {
+    await init();
+    app.listen(port, () => console.log(`Example app listening at port ${port}`));
+  } catch (err) {
+    console.error('Failed to initialize DB or start server', err);
+    process.exit(1);
+  }
+})();

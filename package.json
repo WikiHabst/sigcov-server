@@ -18,6 +18,9 @@
   "license": "MIT",
   "homepage": "",
   "dependencies": {
+    "@sequelize/core": "^7.0.0-alpha.46",
+    "@sequelize/mariadb": "^7.0.0-alpha.46",
+    "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "connect-mongo": "^5.1.0",
     "cors": "^2.8.5",
@@ -32,7 +35,9 @@
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "passport-mediawiki-oauth": "^0.1.0",
-    "sequelize": "^6.37.7"
+    "passport-oauth2": "^1.8.0",
+    "sequelize": "^6.37.7",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "eslint": "^7.27.0",
