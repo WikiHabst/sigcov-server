@@ -56,6 +56,21 @@ async function testConnection() {
 }
 testConnection();
 
+const User = sequelize.define('User', {
+  username: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: false,
+  },
+  score: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  token: {
+    type: DataTypes.STRING,
+  }
+});
+
 passport.serializeUser((user, done) => {
   done(null, user.username);
 });
@@ -89,20 +104,6 @@ passport.use(new MediaWikiStrategy({
   }
 ));
 
-const User = sequelize.define('User', {
-  username: {
-    type: DataTypes.STRING,
-    unique: true,
-    allowNull: false,
-  },
-  score: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  token: {
-    type: DataTypes.STRING,
-  }
-});
 
 async function getDbConnection() {
 	return await mysql.createConnection({
