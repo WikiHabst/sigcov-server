@@ -11,7 +11,7 @@ const passport = require('passport');
 const session = require('express-session');
 // const MySQLStore = require('express-mysql-session')(session);
 const MediaWikiStrategy = require('passport-mediawiki-oauth').OAuthStrategy;
-const { Sequelize } = require('sequelize');
+const { Sequelize, DataTypes } = require('sequelize');
 const JSDOM = jsdom.JSDOM;
 
 global.DOMParser = new JSDOM().window.DOMParser;
@@ -42,15 +42,43 @@ const client = new mwn({
 	password: credentials.bot_password
 });
 
+const sequelize = new Sequelize(credentials.dbname, credentials.dbuser, credentials.dbpass, {
+  host: 'tools.db.svc.wikimedia.cloud',
+  dialect: 'mariadb',
+});
+
 passport.use(new MediaWikiStrategy({
     consumerKey: credentials.oauth_1_clientid,
     consumerSecret: credentials.oauth_1_secret,
     callbackURL: 'https://sigcovhunter.toolforge.org/callback'
   },
-  function(token, tokenSecret, profile, done) {
-    console.log('got profile', profile);
+  async function(token, tokenSecret, profile, done) {
+    try {
+      const [user, created] = await User.findOrCreate({
+        where: { username: profile.username },
+      });
+      await user.update({ token: token });
+      return done(null, user);
+    } catch (err) {
+      return done(err);
+    }
   }
 ));
+
+const User = sequelize.define('User', {
+  username: {
+    type: DataTypes.STRING,
+    unique: true, // Ensure uniqueness for proper findOrCreate behavior
+    allowNull: false,
+  },
+  score: {
+    type: DataTypes.NUMBER,
+    defaultValue: 0,
+  },
+  token: {
+    type: DataTypes.STRING,
+  }
+});
 
 async function getDbConnection() {
 	return await mysql.createConnection({
@@ -70,6 +98,14 @@ async function getDbConnection() {
 	app.get('/', (req, res) => {
 		res.sendFile(__dirname + '/static/index.html');
 	});
+
+  app.get('/me', (req, res) => {
+    if (req.user) {
+      res.send(req.user);
+    } else {
+      res.status(404).send({ message: 'User not found' });
+    }
+  });
 
   app.get('/login', passport.authenticate('mediawiki', { scope: 'email' /* ? */ }));
   app.get('/callback', 
