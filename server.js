@@ -172,8 +172,11 @@ app.get('/login', (req, res, next) => {
 
 app.post('/edit', async (req, res, next) => {
   try {
+    if (!req.body.title || !req.body.text) {
+      return res.status(300).send("Need title and text");
+    }
     const oauthToken = req.user.tokens[0].accessToken;
-    const tokenResp = await (await fetch('https://www.mediawiki.org/w/api.php?' + new URLSearchParams({
+    const tokenResp = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
       action: 'query',
       meta: 'tokens',
       format: 'json',
@@ -181,17 +184,17 @@ app.post('/edit', async (req, res, next) => {
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
     const csrfToken = tokenResp.query.tokens.csrftoken;
-    const formData = new FormData();
-    formData.append('title', req.params.title);
-    formData.append('summary', 'Adding reference with SIGCOV Hunter');
-    formData.append('text', req.params.text);
-    formData.append('token', csrfToken);
     const r = await (await fetch(`https://en.wikipedia.org/w/api.php?${new URLSearchParams({
       action: 'edit',
       format: 'json',
     })}`, {
       method: 'POST',
-      body: formData,
+      body: new URLSearchParams({
+        title: req.body.title,
+        summary: 'Adding reference with SIGCOV Hunter',
+        text: req.body.text,
+        token: csrfToken,
+      }),
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
     if (r.edit?.result === 'Success') {
