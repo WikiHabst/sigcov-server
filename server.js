@@ -274,7 +274,7 @@ app.get('/news', async (req, res) => {
       // sort: 'paper-date-asc',
       sort: 'score-desc',
       'entity-types': 'page,obituary,marriage,birth,enslavement',
-      count: '100',
+      count: '10',
     })}`)).json();
     const matches = [];
     for (const rec of ns[keyword].records.slice(pg * PGSIZE, endIdx)) {
