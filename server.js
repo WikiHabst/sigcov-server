@@ -271,7 +271,8 @@ app.get('/news', async (req, res) => {
     const keyword = `"${base}" ${dab.slice(0, -1)}`.trim();
     ns[keyword] ??= await (await fetch(`https://www.newspapers.com/api/search/query?${new URLSearchParams({
       keyword,
-      sort: 'paper-date-asc',
+      // sort: 'paper-date-asc',
+      sort: 'score-desc',
       'entity-types': 'page,obituary,marriage,birth,enslavement',
       count: '100',
     })}`)).json();
@@ -299,11 +300,13 @@ app.get('/news', async (req, res) => {
           date: rec.page.date,
           pageNo: rec.page.pageNumber,
           url: pgUrl,
-          hasMore: endIdx < ns[keyword].records.length,
         });
       }
     }
-    res.send(matches);
+    res.send({
+      hasMore: endIdx < ns[keyword].records.length,
+      hits: matches,
+    });
   } catch (e) {
     console.log(e)
     res.send(e);
