@@ -264,7 +264,9 @@ const ns = {};
 const ocr = {};
 app.get('/news', async (req, res) => {
   try {
-    const { title } = req.query;
+    const { title, pg = 0 } = req.query;
+    const PGSIZE = 3;
+    const endIdx = pg * PGSIZE + PGSIZE;
     const [base, dab = ''] = title.split(' (');
     const keyword = `"${base}" ${dab.slice(0, -1)}`.trim();
     ns[keyword] ??= await (await fetch(`https://www.newspapers.com/api/search/query?${new URLSearchParams({
@@ -274,7 +276,7 @@ app.get('/news', async (req, res) => {
       count: '100',
     })}`)).json();
     const matches = [];
-    for (const rec of ns[keyword].records.slice(0, 2)) {
+    for (const rec of ns[keyword].records.slice(pg * PGSIZE, endIdx)) {
       console.log(rec);
       const pgid = rec.page.id;
       const pgUrl = `https://www.newspapers.com/newspage/${pgid}/`;
@@ -288,7 +290,7 @@ app.get('/news', async (req, res) => {
       const idxs = [...(ocr[pgid]?.text.matchAll(new RegExp(base, 'ig')) ?? [])].map(m => m.index);
       for (const i of idxs) {
         const baseMatch = ocr[pgid].text.slice(i, i + base.length);
-        const snip = ocr[pgid].text.slice(i - 200, i + base.length + 200).replace(new RegExp(base, 'i'), `||||`);
+        const snip = ocr[pgid].text.slice(i - 300, i + base.length + 300).replace(new RegExp(base, 'i'), `||||`);
         matches.push({
           snipBefore: snip.split('||||')[0],
           baseMatch,
@@ -297,6 +299,7 @@ app.get('/news', async (req, res) => {
           date: rec.page.date,
           pageNo: rec.page.pageNumber,
           url: pgUrl,
+          hasMore: endIdx < ns[keyword].records.length,
         });
       }
     }
