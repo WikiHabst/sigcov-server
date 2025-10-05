@@ -19,6 +19,10 @@ const User = sequelize.define('User', {
   },
   profile: {
     type: DataTypes.JSON
+  },
+  score: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
   }
 }, {
   timestamps: true
@@ -37,7 +41,7 @@ const OAuthToken = sequelize.define('OAuthToken', {
 User.hasMany(OAuthToken, { as: 'tokens' });
 OAuthToken.belongsTo(User);
 
-async function init({ force = true } = {}) {
+async function init({ force = false } = {}) {
   await sequelize.authenticate();
   await sequelize.sync({ force });
   console.log('DB synced');

@@ -163,6 +163,51 @@ app.get('/login', (req, res, next) => {
   passport.authenticate('mediawiki', opts)(req, res, next);
 });
 
+app.post('/edit', async (req, res, next) => {
+  try {
+    const oauthToken = req.user.tokens[0].accessToken;
+    const tokenResp = await (await fetch('https://www.mediawiki.org/w/api.php?' + new URLSearchParams({
+      action: 'query',
+      meta: 'tokens',
+    }), {
+      headers: { Authorization: `Bearer ${oauthToken}` },
+    })).json();
+    const token = tokenResp.query.tokens.csrftoken;
+    const r = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
+      action: 'edit',
+      title: req.params.title,
+      summary: 'Adding reference with SIGCOV Hunter',
+      text: req.params.text,
+      // baserevid: '1234567',
+      token,
+    }), {
+      headers: { Authorization: `Bearer ${oauthToken}` },
+    })).json();
+    if (r.edit?.result === 'Success') {
+      const user = User.findByPk(req.user.id);
+      await user.update({ 
+        score: user.score + 1,
+      });
+    }
+    res.send(r);
+  } catch (e) {
+    res.status(500).send(e);
+  }
+});
+
+app.get('/top', async (req, res, next) => {
+  try {
+    const topUsers = await User.findAll({
+      attributes: ['username', 'score'],
+      order: [['score', 'DESC']],
+      limit: 10
+    });
+    res.send(topUsers);
+  } catch (e) {
+    res.status(500).send(e);
+  }
+})
+
 app.get('/callback', (req, res, next) => {
   passport.authenticate('mediawiki', (err, user, info) => {
     if (err) {
