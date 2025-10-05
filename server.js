@@ -38,6 +38,10 @@ passport.deserializeUser(async (sub, done) => {
 
 // Create a custom OAuth2 strategy that fetches profile from MediaWiki
 class MediaWikiOAuth2Strategy extends OAuth2Strategy {
+  constructor(options, verify) {
+    super(options, verify);
+    this.name = 'mediawiki';
+  }
   userProfile(accessToken, done) {
     // The MediaWiki profile endpoint requires Authorization: Bearer <token>
     console.log('Fetching user profile with access token...');
