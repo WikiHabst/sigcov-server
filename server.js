@@ -175,7 +175,7 @@ app.post('/edit', async (req, res, next) => {
     if (!req.body.title || !req.body.text) {
       return res.status(300).send("Need title and text");
     }
-    const oauthToken = req.user.tokens[0].accessToken;
+    const oauthToken = credentials.env === 'dev' ? credentials.oauthToken : req.user.tokens[0].accessToken;
     const tokenResp = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
       action: 'query',
       meta: 'tokens',
@@ -191,7 +191,8 @@ app.post('/edit', async (req, res, next) => {
       method: 'POST',
       body: new URLSearchParams({
         title: req.body.title,
-        summary: 'Adding reference with SIGCOV Hunter',
+        section: req.body.section ?? '0',
+        summary: req.body.summary ?? 'Adding reference with SIGCOV Hunter',
         text: req.body.text,
         token: csrfToken,
       }),
@@ -281,9 +282,12 @@ app.get('/news', async (req, res) => {
       }
       const idxs = [...(ocr[pgid]?.text.matchAll(new RegExp(base, 'ig')) ?? [])].map(m => m.index);
       for (const i of idxs) {
-        const snip = ocr[pgid].text.slice(i - 200, i + base.length + 200).replaceAll(new RegExp(base, 'ig'), `**${base}**`);
+        const baseMatch = ocr[pgid].text.slice(i, i + base.length);
+        const snip = ocr[pgid].text.slice(i - 200, i + base.length + 200).replace(new RegExp(base, 'i'), `||||`);
         matches.push({
-          snip,
+          snipBefore: snip.split('||||')[0],
+          baseMatch,
+          snipAfter: snip.split('||||')[1],
           publication: rec.publication, // id, name, location
           date: rec.page.date,
           pageNo: rec.page.pageNumber,
