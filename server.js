@@ -130,12 +130,18 @@ passport.use('mediawiki', new MediaWikiOAuth2Strategy({
 const app = express();
 app.use(express.json()); // for parsing the body of POST requests
 app.use(express.static('static')); // serve files in the static directory
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(session({
   secret: credentials.session_secret,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false },
+  cookie: {
+    secure: true,
+    sameSite: 'lax', // change to none
+  }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
