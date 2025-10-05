@@ -6,7 +6,7 @@
   "scripts": {
     "test": "env PORT=3000 nodemon server.js",
     "start": "node server.js",
-    "watch": "node --watch server.js",
+    "watch": "env PORT=8000 node --watch server.js",
     "deploy": "webservice --backend kubernetes node10 restart",
     "logs": "kubectl logs -f $(kubectl get pods | tail -1 | cut -d ' ' -f 1)"
   },
