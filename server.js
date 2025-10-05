@@ -13,9 +13,9 @@ const JSDOM = jsdom.JSDOM;
 const { User, OAuthToken, init } = require('./models');
 
 const MW_WIKI_BASE = "https://en.wikipedia.org";
-const AUTHORIZATION_URL = `${MW_WIKI_BASE}/rest.php/oauth2/authorize`;
-const TOKEN_URL = `${MW_WIKI_BASE}/rest.php/oauth2/access_token`;
-const PROFILE_URL = `${MW_WIKI_BASE}/rest.php/oauth2/resource/profile`;
+const AUTHORIZATION_URL = `${MW_WIKI_BASE}/w/rest.php/oauth2/authorize`;
+const TOKEN_URL = `${MW_WIKI_BASE}/w/rest.php/oauth2/access_token`;
+const PROFILE_URL = `${MW_WIKI_BASE}/w/rest.php/oauth2/resource/profile`;
 
 global.DOMParser = new JSDOM().window.DOMParser;
 
