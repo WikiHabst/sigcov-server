@@ -201,7 +201,7 @@ app.post('/edit', async (req, res, next) => {
     })).json();
     if (r.edit?.result === 'Success') {
       if (req.user) {
-        const user = User.findByPk(req.user.id);
+        const user = await User.findByPk(req.user.id);
         if (user) await user.update({ 
           score: user.score + 1,
         });
