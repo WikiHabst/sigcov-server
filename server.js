@@ -175,7 +175,7 @@ app.post('/edit', async (req, res, next) => {
     if (!req.body.title || !req.body.text) {
       return res.status(300).send("Need title and text");
     }
-    const oauthToken = credentials.env === 'dev' ? credentials.oauthToken : req.user.tokens[0].accessToken;
+    const oauthToken = credentials.env === 'dev' ? credentials.oauthToken : req.user.tokens.at(-1).accessToken;
     const tokenResp = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
       action: 'query',
       meta: 'tokens',
