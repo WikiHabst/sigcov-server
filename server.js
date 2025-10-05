@@ -191,6 +191,7 @@ app.post('/edit', async (req, res, next) => {
     }
     res.send(r);
   } catch (e) {
+    console.error(e);
     res.status(500).send(e);
   }
 });
