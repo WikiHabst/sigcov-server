@@ -94,11 +94,19 @@ passport.use('mediawiki', new MediaWikiOAuth2Strategy({
     }
 
     // upsert user
-    const [user] = await User.upsert({
-      sub: String(profile.sub || profile.id),
-      username: profile.username || profile.id,
-      profile: profile.json || profile
-    }, { returning: true });
+    let user = await User.findOne({ where: { sub: String(profile.sub || profile.id) } });
+    if (user) {
+      await user.update({
+        username: profile.username || profile.id,
+        profile: profile.json || profile
+      });
+    } else {
+      user = await User.create({
+        sub: String(profile.sub || profile.id),
+        username: profile.username || profile.id,
+        profile: profile.json || profile
+      });
+    }
 
     // save token associated with user
     const expiresAt = params && params.expires_in ? new Date(Date.now() + (params.expires_in * 1000)) : null;
