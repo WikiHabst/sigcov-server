@@ -71,7 +71,8 @@ passport.use('mediawiki', new MediaWikiOAuth2Strategy({
   clientID: credentials.oauth_2_clientid,
   clientSecret: credentials.oauth_2_secret,
   callbackURL: 'https://sigcovhunter.toolforge.org/callback',
-  passReqToCallback: false
+  passReqToCallback: false,
+  skipUserProfile: false,
 }, async (accessToken, refreshToken, params, profile, done) => {
   // params often contains expires_in, scope, token_type
   try {
