@@ -40,11 +40,13 @@ passport.deserializeUser(async (sub, done) => {
 class MediaWikiOAuth2Strategy extends OAuth2Strategy {
   userProfile(accessToken, done) {
     // The MediaWiki profile endpoint requires Authorization: Bearer <token>
+    console.log('Fetching user profile with access token...');
     axios.get(PROFILE_URL, {
       headers: { Authorization: `Bearer ${accessToken}` },
       timeout: 5000
     })
       .then(res => {
+        console.log('Profile response:', res.data);
         // expected response contains fields like sub, username, email, groups, etc
         const profile = res.data;
         // normalize profile to passport-style object
@@ -148,16 +150,35 @@ app.get('/login', (req, res, next) => {
   passport.authenticate('mediawiki', opts)(req, res, next);
 });
 
-app.get('/callback',
-  passport.authenticate('mediawiki', {
-    failureRedirect: '/failure',
-    session: true
-  }),
-  (req, res) => {
-    // Successful authentication
-    res.redirect('/success');
-  }
-);
+app.get('/callback', (req, res, next) => {
+  passport.authenticate('mediawiki', (err, user, info) => {
+    if (err) {
+      console.error('OAuth error:', err);
+      return res.redirect(`/failure?err=${encodeURIComponent(err.message || 'OAuth error')}`);
+    }
+    if (!user) {
+      console.warn('No user returned from OAuth:', info);
+      return res.redirect(`/failure?info=${encodeURIComponent(JSON.stringify(info || {}))}`);
+    }
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        console.error('Login error:', loginErr);
+        return res.redirect(`/failure?err=${encodeURIComponent(loginErr.message || 'Login error')}`);
+      }
+      return res.redirect('/success');
+    });
+  })(req, res, next);
+});
+
+app.get('/failure', (req, res) => {
+  const err = req.query.err || '';
+  const info = req.query.info || '';
+  res.status(401).send(`
+    <h2>Login failed</h2>
+    <pre>${err || info || 'Unknown error'}</pre>
+    <p><a href="/login">Try again</a></p>
+  `);
+});
 
 const ns = {};
 const ocr = {};
