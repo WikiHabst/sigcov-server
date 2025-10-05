@@ -189,7 +189,7 @@ app.post('/edit', async (req, res, next) => {
         summary: 'Adding reference with SIGCOV Hunter',
         format: 'json',
         text: req.params.text,
-        token,
+        token: csrfToken,
         // baserevid: '1234567',
       }),
       headers: { Authorization: `Bearer ${oauthToken}` },
