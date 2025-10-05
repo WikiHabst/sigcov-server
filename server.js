@@ -175,7 +175,6 @@ app.post('/edit', async (req, res, next) => {
     const oauthToken = req.user.tokens[0].accessToken;
     console.log('oauthToken', oauthToken);
     const tokenResp = await fetch('https://www.mediawiki.org/w/api.php?' + new URLSearchParams({
-      origin: '*',
       action: 'query',
       meta: 'tokens',
       format: 'json',
@@ -186,7 +185,6 @@ app.post('/edit', async (req, res, next) => {
     console.log('tokenData', tokenData);
     const token = JSON.parse(tokenData).query.tokens.csrftoken;
     const r = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
-      origin: '*',
       action: 'edit',
       title: req.params.title,
       summary: 'Adding reference with SIGCOV Hunter',
