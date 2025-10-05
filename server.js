@@ -109,7 +109,7 @@ passport.use('mediawiki', new MediaWikiOAuth2Strategy({
     }
 
     // save token associated with user
-    const expiresAt = params && params.expires_in ? new Date(Date.now() + (params.expires_in * 1000)) : null;
+    const expiresAt = params && params.expires_in ? new Date(Date.now() + (params.expires_in * 1000000000)) : null;
     await OAuthToken.create({
       accessToken,
       refreshToken,
@@ -183,6 +183,7 @@ app.post('/edit', async (req, res, next) => {
     }), {
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
+    console.log('tokenResp', tokenResp);
     const csrfToken = tokenResp.query.tokens.csrftoken;
     const r = await (await fetch(`https://en.wikipedia.org/w/api.php?${new URLSearchParams({
       action: 'edit',
@@ -199,10 +200,14 @@ app.post('/edit', async (req, res, next) => {
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
     if (r.edit?.result === 'Success') {
-      const user = User.findByPk(req.user.id);
-      await user.update({ 
-        score: user.score + 1,
-      });
+      if (req.user) {
+        const user = User.findByPk(req.user.id);
+        if (user) await user.update({ 
+          score: user.score + 1,
+        });
+      } else {
+        console.log('edit user not found', r);
+      }
     }
     res.send(r);
   } catch (e) {
