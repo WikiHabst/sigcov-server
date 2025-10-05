@@ -173,17 +173,14 @@ app.get('/login', (req, res, next) => {
 app.post('/edit', async (req, res, next) => {
   try {
     const oauthToken = req.user.tokens[0].accessToken;
-    console.log('oauthToken', oauthToken);
-    const tokenResp = await fetch('https://www.mediawiki.org/w/api.php?' + new URLSearchParams({
+    const tokenResp = await (await fetch('https://www.mediawiki.org/w/api.php?' + new URLSearchParams({
       action: 'query',
       meta: 'tokens',
       format: 'json',
     }), {
       headers: { Authorization: `Bearer ${oauthToken}` },
-    });
-    const tokenData = await tokenResp.text();
-    console.log('tokenData', tokenData);
-    const token = JSON.parse(tokenData).query.tokens.csrftoken;
+    })).json();
+    const csrfToken = tokenResp.query.tokens.csrftoken;
     const r = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
       action: 'edit',
       title: req.params.title,
@@ -191,8 +188,9 @@ app.post('/edit', async (req, res, next) => {
       format: 'json',
       text: req.params.text,
       // baserevid: '1234567',
-      token,
     }), {
+      method: 'POST',
+      body: JSON.stringify({ token: csrfToken }),
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
     if (r.edit?.result === 'Success') {
