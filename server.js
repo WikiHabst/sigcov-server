@@ -181,16 +181,17 @@ app.post('/edit', async (req, res, next) => {
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
     const csrfToken = tokenResp.query.tokens.csrftoken;
-    const r = await (await fetch('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({
-      action: 'edit',
-      title: req.params.title,
-      summary: 'Adding reference with SIGCOV Hunter',
-      format: 'json',
-      text: req.params.text,
-      // baserevid: '1234567',
-    }), {
+    console.log('csrfToken', csrfToken);
+    const r = await (await fetch('https://en.wikipedia.org/w/api.php?action=edit', {
       method: 'POST',
-      body: JSON.stringify({ token: csrfToken }),
+      body: JSON.stringify({
+        title: req.params.title,
+        summary: 'Adding reference with SIGCOV Hunter',
+        format: 'json',
+        text: req.params.text,
+        token,
+        // baserevid: '1234567',
+      }),
       headers: { Authorization: `Bearer ${oauthToken}` },
     })).json();
     if (r.edit?.result === 'Success') {
