@@ -178,6 +178,7 @@ app.post('/edit', async (req, res, next) => {
       origin: '*',
       action: 'query',
       meta: 'tokens',
+      format: 'json',
     }), {
       headers: { Authorization: `Bearer ${oauthToken}` },
     });
@@ -189,6 +190,7 @@ app.post('/edit', async (req, res, next) => {
       action: 'edit',
       title: req.params.title,
       summary: 'Adding reference with SIGCOV Hunter',
+      format: 'json',
       text: req.params.text,
       // baserevid: '1234567',
       token,
