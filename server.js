@@ -231,7 +231,8 @@ app.get('/callback', (req, res, next) => {
         console.error('Login error:', loginErr);
         return res.redirect(`/failure?err=${encodeURIComponent(loginErr.message || 'Login error')}`);
       }
-      return res.redirect('/success');
+      return res.redirect('http://localhost:5173/');
+      // return res.redirect('/success');
     });
   })(req, res, next);
 });
