@@ -222,7 +222,8 @@ app.get('/wiki/:page(*)', (req, res) => {
 });
 app.get('/w/:page(*)', (req, res) => {
   const page = req.params.page;
-  res.redirect(302, `https://en.wikipedia.org/w/${page}`);
+  const searchParams = new URLSearchParams(req.query);
+  res.redirect(`https://en.wikipedia.org/w/${page}?${searchParams}`);
 });
 
 app.get('/top', async (req, res, next) => {
