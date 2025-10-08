@@ -216,6 +216,11 @@ app.post('/edit', async (req, res, next) => {
   }
 });
 
+app.get('/wiki/:page(*)', (req, res) => {
+  const page = req.params.page;
+  res.redirect(302, `https://en.wikipedia.org/wiki/${page}`);
+});
+
 app.get('/top', async (req, res, next) => {
   try {
     const topUsers = await User.findAll({
